@@ -277,6 +277,9 @@ public class SDLSurfaceView extends SurfaceView implements SurfaceHolder.Callbac
 
     // Is Python ready to receive input events?
     static boolean mInputActivated = false;
+    
+    // Is Composing text being repeated?
+    static boolean mComposingText = false;
 
     // The number of times we should clear the screen after swap.
     private int mClears = 2;
@@ -1051,47 +1054,26 @@ public class SDLSurfaceView extends SurfaceView implements SurfaceHolder.Callbac
 
     @Override
     public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        // setting inputtype to TYPE_CLASS_TEXT is necessary for swiftkey to enable
-        outAttrs.inputType = EditorInfo.TYPE_CLASS_TEXT;
-        // ask IME to avoid taking full screen on landscape mode
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI;
-        return new BaseInputConnection(this, false){
-
-
-            private void deleteLastText(){
-                // send back space keys
-                for (int i = 0; i < mDelLen; i++){
-                    nativeKey(KeyEvent.KEYCODE_DEL, 1, 23);
-                    nativeKey(KeyEvent.KEYCODE_DEL, 0, 23);
-                }
-            }
-
-            @Override
-            public boolean setComposingText(CharSequence text,
-                    int newCursorPosition){
-                //Log.i("Python:", String.format("set Composing Text %s", text));
-                this.deleteLastText();
-                // send text
-                for(int i = 0; i < text.length(); i++){
-                    // Calls both up/down events to emulate key pressing
-                    char c = text.charAt(i);
-                    nativeKey(45, 1, (int) c);
-                    nativeKey(45, 0, (int) c);
-                }
-                // store len to be deleted for next time
-                mDelLen = text.length();
-                return super.setComposingText(text, newCursorPosition);
-            }
-
-            @Override
-            public boolean commitText(CharSequence text, int newCursorPosition) {
-                // some code which takes the input and manipulates it and calls editText.getText().replace() afterwards
-                //Log.i("Python:", String.format("Commit Text %s", text));
-                this.deleteLastText();
-                mDelLen = 0;
-                return super.commitText(text, newCursorPosition);
-            }
-        };
+    	outAttrs.inputType = EditorInfo.TYPE_NULL;
+    	return new BaseInputConnection(this, false) {
+    	
+    		@Override
+    	    public boolean setComposingText(CharSequence text,
+    	                               int newCursorPosition) {
+    	                commitText(text, 0);
+    	                mComposingText = true;
+    	                sendKeyEvent(
+    	                            new KeyEvent(
+    	                                        KeyEvent.ACTION_DOWN,
+    	                                        KeyEvent.KEYCODE_SPACE));
+    	                sendKeyEvent(
+    	                            new KeyEvent(
+    	                                        KeyEvent.ACTION_UP,
+    	                                        KeyEvent.KEYCODE_SPACE));
+    	                //Log.i("Python:", String.format("set Composing Text %s", mComposingText));
+    	                return true;
+    	    }
+    	};
     }
 
     static void activateInput() {
